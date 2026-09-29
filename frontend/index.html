@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Serverless Cloud File Upload & Processing System — AWS S3 + Lambda Image Pipeline. Student: Adarsh Mund, Centurion University." />
+  <title>Cloud Image Pipeline · Adarsh Mund</title>
+
+  <!-- Google Fonts: JetBrains Mono for monospace -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ════════════════════════════════════════════════════════════
+       HEADER
+  ════════════════════════════════════════════════════════════ -->
+  <header class="site-header">
+    <div class="header-brand">
+      <div class="header-logo">☁️</div>
+      <div>
+        <div class="header-title">Serverless Cloud File Upload &amp; Processing System</div>
+        <div class="header-sub">AWS S3 + Lambda Image Thumbnail Pipeline</div>
+      </div>
+    </div>
+    <div class="header-meta">
+      <div><strong>Adarsh Mund</strong></div>
+      <div>Centurion University of Technology &amp; Management</div>
+      <div>10-Day Cloud Computing Major Project</div>
+      <div class="mt-12">
+        <span class="badge-aws">☁ AWS Cloud</span>
+      </div>
+    </div>
+  </header>
+
+
+  <!-- ════════════════════════════════════════════════════════════
+       PIPELINE STEPPER
+  ════════════════════════════════════════════════════════════ -->
+  <div class="card" style="padding: 18px 24px;">
+    <div class="section-label mb-12">Execution Pipeline</div>
+    <div id="pipeline-row" class="pipeline"></div>
+  </div>
+
+
+  <!-- ════════════════════════════════════════════════════════════
+       UPLOAD CARD
+  ════════════════════════════════════════════════════════════ -->
+  <div class="card">
+    <div class="section-label mb-12">Upload Image</div>
+
+    <!-- Status bar -->
+    <div id="status-bar" class="status-bar idle">
+      <div class="status-dot"></div>
+      <span id="status-text" class="status-text">Drop an image file here or click to browse.</span>
+      <span id="status-stage" class="status-stage">IDLE</span>
+    </div>
+
+    <!-- Progress bar -->
+    <div id="progress-track" class="progress-track">
+      <div id="progress-fill" class="progress-fill"></div>
+    </div>
+
+    <!-- Drop zone -->
+    <div id="drop-zone" class="drop-zone" role="button" tabindex="0" aria-label="File upload area">
+      <span class="drop-icon">📤</span>
+      <div class="drop-title">Drag &amp; Drop your image here</div>
+      <div class="drop-sub">or click anywhere in this zone to browse files</div>
+
+      <div class="drop-formats">
+        <span class="fmt-badge fmt-jpg">JPG / JPEG</span>
+        <span class="fmt-badge fmt-png">PNG</span>
+        <span class="fmt-badge fmt-webp">WebP</span>
+      </div>
+
+      <div class="text-muted text-sm">Maximum file size: 10 MB</div>
+    </div>
+
+    <!-- Hidden native file input -->
+    <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp"
+           style="display:none" aria-hidden="true" />
+
+    <!-- Selected file card -->
+    <div id="file-card" class="hidden mt-16"
+         style="background:var(--bg-card2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+      <span style="font-size:28px;">🖼️</span>
+      <div style="flex:1;min-width:0;">
+        <div id="file-name" class="text-mono" style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
+        <div id="file-size" class="text-muted text-sm mt-12"></div>
+      </div>
+      <div class="flex gap-8">
+        <button id="upload-btn" class="btn btn-primary" disabled>
+          ⚡ Process with Lambda
+        </button>
+        <button id="clear-btn" class="btn btn-secondary">
+          ✕ Clear
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ════════════════════════════════════════════════════════════
+       CLOUDWATCH LOG STREAM (live simulation)
+  ════════════════════════════════════════════════════════════ -->
+  <div class="card">
+    <div class="section-label mb-12">CloudWatch Log Stream — <span class="text-mono text-sm">/aws/lambda/image-processing-pipeline</span></div>
+    <div id="log-stream" class="log-stream"></div>
+  </div>
+
+
+  <!-- ════════════════════════════════════════════════════════════
+       RESULTS SECTION (hidden until pipeline completes)
+  ════════════════════════════════════════════════════════════ -->
+  <div id="result-section" class="hidden">
+
+    <!-- Quick-stat cards -->
+    <div class="stats-row">
+      <div class="stat-card s-green">
+        <div id="stat-reduction" class="stat-value">—</div>
+        <div class="stat-label">Size Reduction</div>
+      </div>
+      <div class="stat-card s-blue">
+        <div id="stat-latency" class="stat-value">—</div>
+        <div class="stat-label">Execution Latency</div>
+      </div>
+      <div class="stat-card s-amber">
+        <div id="stat-orig-size" class="stat-value">—</div>
+        <div class="stat-label">Original Payload</div>
+      </div>
+      <div class="stat-card s-purple">
+        <div id="stat-thumb-size" class="stat-value">—</div>
+        <div class="stat-label">Thumbnail Size</div>
+      </div>
+    </div>
+
+    <!-- Image comparison -->
+    <div class="card">
+      <div class="section-label mb-12">Image Comparison — Original vs Processed Thumbnail</div>
+
+      <div class="comparison-grid">
+
+        <!-- Original -->
+        <div id="panel-original" class="image-panel panel-original">
+          <div class="image-panel-header">
+            <div class="panel-label">
+              🟡 Original
+            </div>
+            <span class="panel-size-badge">—</span>
+          </div>
+          <div class="image-panel-body">
+            <div class="image-placeholder">
+              <div class="placeholder-icon">🖼️</div>
+              <div>Original will appear here</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Processed thumbnail -->
+        <div id="panel-processed" class="image-panel panel-processed">
+          <div class="image-panel-header">
+            <div class="panel-label">
+              🟢 Processed Thumbnail (200×200)
+            </div>
+            <span class="panel-size-badge">—</span>
+          </div>
+          <div class="image-panel-body">
+            <div class="image-placeholder">
+              <div class="placeholder-icon">⚡</div>
+              <div>Lambda output will appear here</div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /comparison-grid -->
+    </div>
+
+    <!-- Metadata table -->
+    <div class="card">
+      <div class="section-label mb-12">Processing Metadata</div>
+      <table class="meta-table">
+        <thead>
+          <tr>
+            <th>Metric / Key</th>
+            <th>Value</th>
+          </tr>
+        </thead>
+        <tbody id="meta-table-body">
+          <!-- Populated by app.js -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- S3 Event Payload viewer -->
+    <div class="card">
+      <div class="section-label mb-12">S3 Event Record — Lambda Trigger Payload</div>
+      <div id="event-viewer" class="s3-event-box">
+        <!-- Populated by app.js -->
+      </div>
+    </div>
+
+    <!-- AWS Architecture info panel -->
+    <div class="card">
+      <div class="section-label mb-12">AWS Architecture Map</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">
+
+        <div style="background:var(--bg-card2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;">
+          <div style="font-size:1.6rem;margin-bottom:8px;">🪣</div>
+          <div style="font-weight:700;color:var(--accent-amber);margin-bottom:4px;">Amazon S3</div>
+          <div class="text-sm text-muted">Object storage — hosts uploaded images and processed thumbnails in <code>uploads/</code> and <code>processed/</code> prefixes.</div>
+        </div>
+
+        <div style="background:var(--bg-card2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;">
+          <div style="font-size:1.6rem;margin-bottom:8px;">⚡</div>
+          <div style="font-weight:700;color:var(--accent-blue);margin-bottom:4px;">AWS Lambda</div>
+          <div class="text-sm text-muted">Event-driven compute — triggered by S3 ObjectCreated event. Runs Python 3.12 with Pillow to resize images to 200×200 px.</div>
+        </div>
+
+        <div style="background:var(--bg-card2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;">
+          <div style="font-size:1.6rem;margin-bottom:8px;">📊</div>
+          <div style="font-weight:700;color:var(--accent-green);margin-bottom:4px;">CloudWatch Logs</div>
+          <div class="text-sm text-muted">Centralized logging for all Lambda executions — includes timing, error traces, and processing metrics.</div>
+        </div>
+
+        <div style="background:var(--bg-card2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;">
+          <div style="font-size:1.6rem;margin-bottom:8px;">🔑</div>
+          <div style="font-weight:700;color:var(--accent-purple);margin-bottom:4px;">AWS IAM</div>
+          <div class="text-sm text-muted">Least-privilege role grants Lambda only <code>s3:GetObject</code> and <code>s3:PutObject</code> on the target bucket.</div>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- /result-section -->
+
+
+  <!-- ════════════════════════════════════════════════════════════
+       FOOTER
+  ════════════════════════════════════════════════════════════ -->
+  <footer class="site-footer">
+    <strong>Adarsh Mund</strong> &nbsp;|&nbsp; Centurion University of Technology &amp; Management
+    &nbsp;|&nbsp; 10-Day Cloud Computing Major Project &nbsp;|&nbsp;
+    Serverless Architecture — AWS S3 · Lambda · CloudWatch · IAM
+  </footer>
+
+</div><!-- /#app -->
+
+<script src="app.js"></script>
+</body>
+</html>
